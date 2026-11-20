@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coco.local/schemas/audio_result.schema.json",
+  "title": "CoCo device audio.result (device → backend)",
+  "description": "Terminal success-like outcome for an audio.play or audio.cancel. Firmware consumer semantics, local MAX98357A tone bring-up, and software WebSocket transport exist, but this result does not imply real speech decoding or hardware listen validation.",
+  "type": "object",
+  "properties": {
+    "type": {
+      "const": "audio.result"
+    },
+    "command_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "audio_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "status": {
+      "enum": [
+        "played",
+        "cancelled",
+        "skipped"
+      ]
+    },
+    "played_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 60000
+    },
+    "completed_at": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 253402300799
+    }
+  },
+  "required": [
+    "type",
+    "command_id",
+    "audio_id",
+    "status"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coco.local/schemas/voice_utterance.schema.json",
+  "title": "CoCo device-initiated voice utterance messages",
+  "description": "Autonomous conversation frames. The device's local VAD opens an utterance; the backend binds it to a capture request_id and the device then streams PCM using the existing asr.audio.chunk / asr.capture.completed contract. These frames carry no audio and can never authorize motion.",
+  "oneOf": [
+    {
+      "type": "object",
+      "description": "device -> server: local VAD detected speech, optionally after a device-local wake gate. source is metadata and grants no additional permission.",
+      "properties": {
+        "type": { "const": "asr.utterance.open" },
+        "device_id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" },
+        "utterance_id": { "type": "string", "minLength": 1, "maxLength": 40, "pattern": "^[A-Za-z0-9._:-]+$" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "protocol_version": { "const": "1" },
+        "source": { "enum": ["device_vad", "device_wake"] },
+        "sample_rate_hz": { "const": 16000 },
+        "channels": { "const": 1 },
+        "bits_per_sample": { "const": 16 }
+      },
+      "required": [
+        "type", "device_id", "utterance_id", "generation", "protocol_version",
+        "source", "sample_rate_hz", "channels", "bits_per_sample"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "description": "server -> device: utterance accepted; stream into request_id.",
+      "properties": {
+        "type": { "const": "asr.utterance.accepted" },
+        "utterance_id": { "type": "string", "minLength": 1, "maxLength": 40, "pattern": "^[A-Za-z0-9._:-]+$" },
+        "request_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" },
+        "session_nonce": { "type": "string", "minLength": 32, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "protocol_version": { "const": "1" }
+      },
+      "required": [
+        "type", "utterance_id", "request_id", "session_nonce", "generation",
+        "protocol_version"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "description": "server -> device: utterance refused; the device discards staged audio. An invalid utterance_id is omitted rather than echoed.",
+      "properties": {
+        "type": { "const": "asr.utterance.rejected" },
+        "utterance_id": { "type": "string", "minLength": 1, "maxLength": 40, "pattern": "^[A-Za-z0-9._:-]+$" },
+        "reason": {
+          "enum": [
+            "UTTERANCE_ID_INVALID",
+            "PROTOCOL_MISMATCH",
+            "SOURCE_INVALID",
+            "AUDIO_FORMAT_INVALID",
+            "AUDIO_UNSUPPORTED",
+            "AUDIO_BUSY",
+            "STALE_SESSION",
+            "UTTERANCE_DUPLICATE",
+            "VOICE_DISABLED"
+          ]
+        },
+        "session_nonce": { "type": "string", "minLength": 32, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "protocol_version": { "const": "1" }
+      },
+      "required": [
+        "type", "reason", "session_nonce", "generation",
+        "protocol_version"
+      ],
+      "if": { "properties": { "reason": { "const": "UTTERANCE_ID_INVALID" } } },
+      "else": { "required": ["utterance_id"] },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "description": "device -> server: user spoke over playback. The device has ALREADY cancelled playback locally before sending this; the server must not treat this frame as the trigger for stopping audio.",
+      "properties": {
+        "type": { "const": "voice.interrupt" },
+        "device_id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" },
+        "utterance_id": { "type": "string", "minLength": 1, "maxLength": 40, "pattern": "^[A-Za-z0-9._:-]+$" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "protocol_version": { "const": "1" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 32, "pattern": "^[A-Z0-9_]+$" }
+      },
+      "required": [
+        "type", "device_id", "utterance_id", "generation", "protocol_version",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "description": "server -> device: the turn is over (answered or failed). The device resumes LISTENING and is never stranded in PROCESSING.",
+      "properties": {
+        "type": { "const": "voice.turn.settled" },
+        "utterance_id": { "type": "string", "minLength": 1, "maxLength": 40, "pattern": "^[A-Za-z0-9._:-]+$" },
+        "session_nonce": { "type": "string", "minLength": 32, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" },
+        "generation": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "protocol_version": { "const": "1" }
+      },
+      "required": [
+        "type", "session_nonce", "generation", "protocol_version"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

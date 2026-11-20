@@ -1,0 +1,475 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coco.local/schemas/app_message.schema.json",
+  "title": "CoCo app channel message",
+  "$defs": {
+    "safeToolCallRecord": {
+      "type": "object",
+      "properties": {
+        "tool": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "args_redacted": {
+          "type": "object"
+        },
+        "category": {
+          "enum": [
+            "safe",
+            "approval",
+            "blocked"
+          ]
+        },
+        "status": {
+          "enum": [
+            "executed",
+            "sent",
+            "pending_approval",
+            "blocked",
+            "failed"
+          ]
+        },
+        "result_summary": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 4096
+        },
+        "approval_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "tool",
+        "args_redacted",
+        "category",
+        "status"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "app.auth"
+        },
+        "token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "type",
+        "token"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "app.chat"
+        },
+        "conversation_id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        }
+      },
+      "required": [
+        "type",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "app.chat.reply"
+        },
+        "conversation_id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 16000
+        },
+        "tool_calls": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/safeToolCallRecord"
+          }
+        },
+        "ai_backend": {
+          "enum": [
+            "openai_compatible",
+            "fallback_parser"
+          ]
+        },
+        "history_status": {
+          "enum": ["disabled", "saved", "not_saved", "bypassed"]
+        }
+      },
+      "required": [
+        "type",
+        "text",
+        "tool_calls",
+        "ai_backend"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "app.tool_approval"
+        },
+        "approval_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "tool": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "args_redacted": {
+          "type": "object"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "approved",
+            "rejected",
+            "executed",
+            "failed"
+          ]
+        },
+        "result_summary": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "type",
+        "approval_id",
+        "tool",
+        "args_redacted",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "app.device_update"
+        },
+        "device_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "online": {
+          "type": "boolean"
+        },
+        "state": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "type",
+        "device_id",
+        "online"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "ping"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "pong"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "settings.language.get"
+        },
+        "request_id": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "settings.language.set"
+        },
+        "language": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 32
+        },
+        "request_id": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "type",
+        "language"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "settings.language"
+        },
+        "language": {
+          "type": "string"
+        },
+        "supported_languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "default_language": {
+          "type": "string"
+        },
+        "scope": {
+          "const": "global"
+        },
+        "generation": {
+          "type": "integer"
+        },
+        "persisted": {
+          "type": "boolean"
+        },
+        "request_id": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "tts": {
+          "type": "object"
+        },
+        "asr": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "type",
+        "language",
+        "supported_languages"
+      ],
+      "additionalProperties": true
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "settings.language.ack"
+        },
+        "status": {
+          "enum": [
+            "applied",
+            "unchanged",
+            "degraded",
+            "rejected",
+            "failed"
+          ]
+        },
+        "language": {
+          "type": "string"
+        },
+        "previous_language": {
+          "type": "string"
+        },
+        "supported_languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "scope": {
+          "const": "global"
+        },
+        "persisted": {
+          "type": "boolean"
+        },
+        "generation": {
+          "type": "integer"
+        },
+        "request_id": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "message": {
+          "type": "string"
+        },
+        "error_code": {
+          "type": "string"
+        },
+        "tts": {
+          "type": "object"
+        },
+        "asr": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "type",
+        "status",
+        "language",
+        "supported_languages",
+        "scope"
+      ],
+      "additionalProperties": true
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "settings.language.changed"
+        },
+        "status": {
+          "enum": [
+            "applied",
+            "degraded"
+          ]
+        },
+        "language": {
+          "type": "string"
+        },
+        "previous_language": {
+          "type": "string"
+        },
+        "supported_languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "scope": {
+          "const": "global"
+        },
+        "persisted": {
+          "type": "boolean"
+        },
+        "generation": {
+          "type": "integer"
+        },
+        "tts": {
+          "type": "object"
+        },
+        "asr": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "type",
+        "language",
+        "supported_languages",
+        "scope"
+      ],
+      "additionalProperties": true
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "settings.language.error"
+        },
+        "error": {
+          "type": "string"
+        },
+        "error_code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "language": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scope": {
+          "const": "global"
+        },
+        "request_id": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "supported_languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "error",
+        "supported_languages"
+      ],
+      "additionalProperties": true
+    }
+  ]
+}

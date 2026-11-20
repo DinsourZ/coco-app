@@ -1,0 +1,48 @@
+name: CoCo App CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Minimal read-only permissions; external PRs never access production secrets.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, Tests, Native Export & Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript check
+        run: npm run typecheck
+
+      - name: Unit & contract tests
+        run: npm run test
+
+      - name: Secret, private-endpoint & license scan
+        run: npm run secret-scan
+
+      - name: Dependency audit (high/critical)
+        run: npm audit --audit-level=high || true
+
+      - name: Expo native static bundle export with Hermes bytecode (Android & iOS)
+        run: npm run export:native:hermes

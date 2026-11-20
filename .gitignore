@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Expo & native build artifacts
+.expo/
+dist/
+web-build/
+ios/
+android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Environment & secrets (never commit real endpoints, keys, or tokens)
+.env
+.env.*
+!.env.example
+*.pem
+*.crt
+*.sqlite
+*.db
+*.log
+
+# OS & editor files
+.DS_Store
+Thumbs.db
+coverage/

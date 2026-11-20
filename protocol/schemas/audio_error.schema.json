@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coco.local/schemas/audio_error.schema.json",
+  "title": "CoCo device audio.error (device → backend)",
+  "description": "Failed audio.play/cancel handling. error_code is a closed enum for stable backend logging.",
+  "type": "object",
+  "properties": {
+    "type": { "const": "audio.error" },
+    "command_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "audio_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "error_code": {
+      "enum": [
+        "unsupported_mime_type",
+        "too_large",
+        "decode_failed",
+        "playback_failed",
+        "cancelled",
+        "deadline_exceeded",
+        "busy",
+        "safety_stop",
+        "unauthorized_asset",
+        "invalid_audio_payload"
+      ]
+    },
+    "message": { "type": "string", "maxLength": 4096 },
+    "recoverable": { "type": "boolean" },
+    "completed_at": {
+      "type": "number", "minimum": 0, "maximum": 253402300799
+    }
+  },
+  "required": ["type", "command_id", "audio_id", "error_code", "message"],
+  "additionalProperties": false
+}

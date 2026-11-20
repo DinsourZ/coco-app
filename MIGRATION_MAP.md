@@ -1,0 +1,43 @@
+# CoCo App Migration Map
+
+- **Source Repository (Private)**: `https://github.com/DinsourZ/coco-os` (untouched, remains private)
+- **Evaluated Branches**:
+  - Default branch `feat/coco-platform-v0.1` @ `1bde9c7cd57e95f03a1e003096a66a752437ef02` (2026-10-14)
+  - Draft PR #70 branch `integration/coco-full-recovery-20261114` @ `8b981d7befd6c733f4b7b5942cabd4a64d8f92c8` (2026-11-14) — **selected as primary extraction source** (94 files / +11,211 lines of verified protocol, chat cancellation, requester approval, display observation, and credential lifecycle hardening over default branch; extracted strictly from committed git tree `8b981d7befd6c733f4b7b5942cabd4a64d8f92c8`, excluding uncommitted local WIP).
+- **Target Repository (Public)**: `https://github.com/DinsourZ/coco-app` (`CoCo App`, clean `git init -b main`)
+
+## Detailed File-by-File Migration Inventory
+
+| Source File (`coco-os` @ `8b981d7b`) | Target File (`coco-app`) | Disposition | Rationale | Dependencies | License |
+|---|---|---|---|---|---|
+| `protocol/schemas/app_message.schema.json` | `protocol/schemas/app_message.schema.json` | **Direct Port** | Authoritative `/ws/app` client-server message schema | None (JSON Schema) | MIT (`coco-os`) |
+| `protocol/schemas/tool_call.schema.json` | `protocol/schemas/tool_call.schema.json` | **Direct Port** | Shared tool call status/category schema rendered in chat UI | None | MIT (`coco-os`) |
+| `protocol/schemas/audio_play.schema.json` | `protocol/schemas/audio_play.schema.json` | **Direct Port** | Audio playback contract for Phase-2 mobile audio integration | None | MIT (`coco-os`) |
+| `protocol/schemas/audio_cancel.schema.json` | `protocol/schemas/audio_cancel.schema.json` | **Direct Port** | Audio cancellation contract for Phase-2 mobile audio integration | None | MIT (`coco-os`) |
+| `protocol/schemas/audio_result.schema.json` | `protocol/schemas/audio_result.schema.json` | **Direct Port** | Audio result contract for Phase-2 voice/audio diagnostics | None | MIT (`coco-os`) |
+| `protocol/schemas/audio_error.schema.json` | `protocol/schemas/audio_error.schema.json` | **Direct Port** | Audio error contract for Phase-2 diagnostics | None | MIT (`coco-os`) |
+| `protocol/schemas/voice_utterance.schema.json` | `protocol/schemas/voice_utterance.schema.json` | **Direct Port** | Voice utterance contract for Phase-2 voice integration | None | MIT (`coco-os`) |
+| `protocol/coco_protocol.md` | `protocol/coco_protocol.md` | **Adapted** | Trimmed to client-facing REST & `/ws/app` protocol; removed broken links to private firmware/ops docs | None | MIT (`coco-os`) |
+| `platform/web/src/api/controlContext.ts` | `packages/protocol/src/controlContext.ts` | **Direct Port** | Pure TS `X-CoCo-Control-Session` / `X-CoCo-Control-Generation` header contract | TypeScript | MIT (`coco-os`) |
+| `platform/web/src/api/displayObservation.ts` | `packages/protocol/src/displayObservation.ts` | **Direct Port** | Pure TS display observation validation (prevents stale face rendering) | TypeScript | MIT (`coco-os`) |
+| `platform/web/src/api/chatCancellation.ts` | `packages/protocol/src/chatCancellation.ts` | **Adapted** | Pure TS chat cancellation validator + added RN-safe `generateChatRequestId()` | `exactJson` | MIT (`coco-os`) |
+| `platform/web/src/api/ownedApprovals.ts` | `packages/protocol/src/ownedApprovals.ts` | **Direct Port** | Pure TS requester-owned approval decoder & withdrawal validation | `exactJson` | MIT (`coco-os`) |
+| `platform/web/src/api/approvalResponses.ts` | `packages/protocol/src/approvalResponses.ts` | **Direct Port** | Pure TS approver queue & decision decoder | `exactJson`, `ownedApprovals` | MIT (`coco-os`) |
+| `platform/web/src/api/exactJson.ts` | `packages/protocol/src/exactJson.ts` | **Adapted** | Ported bounded BigInt exact JSON parser and added React Native Hermes fallback when `Response.body.getReader()` is absent | TypeScript | MIT (`coco-os`) |
+| `platform/web/src/api/deviceObservation.ts` | `packages/protocol/src/deviceObservation.ts` | **Adapted** | Replaced Web DOM `document.visibilityState`/`navigator.onLine` with RN-compatible `ObservationEnvironmentState` | TypeScript | MIT (`coco-os`) |
+| `platform/web/src/api/client.ts` | `packages/protocol/src/types.ts`, `packages/api-client/src/{authStore,errors,client,socket,interfaces}.ts` | **Adapted** | Split into clean protocol types, configurable HTTPS/WSS client (`HttpCoCoClient`), `InMemoryAuthStore`, and RN/Node-safe `openAppSocket` (removed `window`/`location` DOM assumptions and private Sentinel/HIL admin endpoints) | `@coco/protocol` | MIT (`coco-os`) |
+| `platform/web/package.json` | `package.json` | **Reference Only** | Verified React 18.3 / TypeScript 5.5 / `qrcode@1.5.4` compatibility; replaced Vite Web SPA with native Expo SDK 52 + React Native 0.76 | Expo, RN, `qrcode`, Vitest | MIT / Apache-2.0 |
+| `platform/web/src/components/ChatBox.tsx` | `src/screens/ChatScreen.tsx` | **Adapted (Rewritten for Native)** | Rebuilt in native React Native components (`FlatList`, `TextInput`, `Pressable`); preserved `/api/chat`, cancellation, and optional history semantics | React Native, `@coco/api-client` | MIT (`coco-os`) |
+| `platform/web/src/components/DeviceControls.tsx` | `src/screens/DevicesScreen.tsx`, `src/components/EmergencyStopBar.tsx` | **Adapted (Rewritten for Native)** | Rebuilt in native RN; extracted global independent Emergency STOP bar preserving precondition-free STOP invariant | React Native, `@coco/api-client` | MIT (`coco-os`) |
+| `platform/web/src/components/DevicePairingPanel.tsx` | `src/screens/PairingScreen.tsx`, `src/components/QrCodeMatrix.tsx`, `src/utils/qrMatrix.ts` | **Adapted (Rewritten for Native)** | Rebuilt in native RN; renders plain-text `pairing_code` QR via pure RN `View` matrix (`qrcode` MIT) and `expo-clipboard` | `qrcode`, `expo-clipboard` | MIT (`coco-os`, `qrcode`) |
+| `platform/web/src/components/DeviceCredentialPanel.tsx` | `src/screens/DevicesScreen.tsx` | **Adapted (Rewritten for Native)** | Rebuilt in native RN; preserves metadata list, explicit confirm before rotate/revoke, and RAM-only one-time rotated token display | `expo-clipboard` | MIT (`coco-os`) |
+| `platform/web/src/pages/SettingsPage.tsx` | `src/screens/SettingsScreen.tsx` | **Adapted (Rewritten for Native)** | Rebuilt for mobile with HTTPS/WSS URL configuration, Mock Mode switch, RAM-only role tokens, language settings, and explicit Phase-2 TODOs | React Native | MIT (`coco-os`) |
+| `docs/app_plan.md`, `docs/architecture.md`, `docs/device_pairing.md`, `docs/device_credential_lifecycle.md`, `docs/chat_history.md` | `docs/ARCHITECTURE.md` | **Reference Only** | Used to verify architecture boundaries, pairing/credential lifecycles, and safety invariants without exposing private backend internals | None | MIT (`coco-os`) |
+| `platform/backend/app/{main,auth,routes/*,devices/websocket}.py` | *(Not copied)* | **Reference Only (Excluded from Repo)** | Inspected solely to verify exact REST endpoints, Bearer role auth, `/ws/app` first-frame auth, and STOP behavior; backend stays in private `coco-os` | — | Private (`coco-os`) |
+| `platform/backend/**`, `platform/device-gateway/**`, `platform/worker/**` | *(Not copied)* | **Excluded** | Private backend services, mTLS gateway, AI provider credentials, SQLite/audit stores, and server-side policy engine | — | Private (`coco-os`) |
+| `firmware/**` | *(Not copied)* | **Excluded** | ESP32-S3 firmware, font binaries (OFL-1.1 / Apache-2.0), and Espressif-restricted SDK wrappers (ESP-SR ESPRESSIF MIT) | — | Mixed / Private |
+| `mechanical/**` | *(Not copied)* | **Excluded** | CAD & hardware mechanical files unrelated to mobile App | — | Private (`coco-os`) |
+| `ops/**`, `scripts/**`, `docker-compose*.yml`, `.env.example` | *(Not copied)* | **Excluded** | Internal deployment, Sentinel ops, recovery drills, and server configuration | — | Private (`coco-os`) |
+| `protocol/schemas/{device_message,hil_actuation,server_session,voice_pack_manifest,wake_word}.schema.json`, `protocol/schemas/sentinel/**` | *(Not copied)* | **Excluded** | Device-to-backend, hardware-in-the-loop, firmware wake-word, and internal Sentinel telemetry schemas not needed by public mobile client | — | Private (`coco-os`) |
+| `platform/web/src/components/Sentinel*`, `HilWorkbench*`, `e2e/**`, `Dockerfile`, `nginx.conf` | *(Not copied)* | **Excluded** | Internal ops/HIL web console panels, Web PWA manifest, and web-only nginx/e2e harness | — | Private (`coco-os`) |
+| `reports/**`, `references/**`, `.git/**` | *(Not copied)* | **Excluded** | Internal audit reports, historical snapshots, and full private git history (forbidden to leak) | — | Private (`coco-os`) |
