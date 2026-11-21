@@ -33,6 +33,14 @@ class CoCoApiResponse {
   final bool hasBody;
 }
 
+/// A display-only pairing ticket. Extra server fields are never retained.
+class PairingTicket {
+  const PairingTicket._({required this.code, required this.expiresAt});
+
+  final String code;
+  final DateTime expiresAt;
+}
+
 /// An app event, retaining all server fields in [payload].
 class CoCoAppMessage {
   const CoCoAppMessage(this.type, this.payload);
@@ -57,12 +65,14 @@ class CoCoApi {
     CoCoSocketConnector? socketConnector,
     this.timeout = const Duration(seconds: 30),
     String credentialsPath = '/api/credentials',
+    String pairingTicketsPath = '/api/pairing/tickets',
   })  : _baseUrl = baseUrl,
         _token = token,
         _client = client ?? http.Client(),
         _ownsClient = client == null,
         _socketConnector = socketConnector ?? WebSocketChannel.connect,
-        _credentialsPath = credentialsPath {
+        _credentialsPath = credentialsPath,
+        _pairingTicketsPath = pairingTicketsPath {
     if (!['http', 'https'].contains(baseUrl.scheme) ||
         baseUrl.host.isEmpty ||
         baseUrl.userInfo.isNotEmpty ||
@@ -85,6 +95,16 @@ class CoCoApi {
             )) {
       throw ArgumentError('credentialsPath must be an absolute API path.');
     }
+    final pairingPath = Uri.tryParse(pairingTicketsPath);
+    if (!pairingTicketsPath.startsWith('/') ||
+        pairingPath == null ||
+        pairingPath.hasAuthority ||
+        pairingPath.hasQuery ||
+        pairingPath.hasFragment ||
+        pairingPath.pathSegments.where((part) => part.isNotEmpty).isEmpty ||
+        pairingPath.pathSegments.any((part) => part == '.' || part == '..')) {
+      throw ArgumentError('pairingTicketsPath must be an absolute API path.');
+    }
   }
 
   static const chatMethod = 'POST';
@@ -98,6 +118,7 @@ class CoCoApi {
   final bool _ownsClient;
   final CoCoSocketConnector _socketConnector;
   final String _credentialsPath;
+  final String _pairingTicketsPath;
   final Duration timeout;
   WebSocketChannel? _socket;
   StreamSubscription<dynamic>? _socketSubscription;
@@ -144,6 +165,39 @@ class CoCoApi {
     await _request('POST', [
       'api', 'chat', 'requests', _segment(requestId), 'cancel',
     ]);
+  }
+
+  /// Request a ticket for display only; this never claims or polls a device.
+  ///
+  /// The response must contain a plain `code` and an ISO-8601 `expires_at`
+  /// with a timezone. URLs, JSON payloads, and credentials are not QR data.
+  Future<PairingTicket> requestPairingTicket() async {
+    final token = _requireToken();
+    final response = _object(await _request('POST', [
+      ...Uri.parse(_pairingTicketsPath)
+          .pathSegments
+          .where((part) => part.isNotEmpty),
+    ]));
+    if (_closed || _token != token) {
+      throw const CoCoApiException('Pairing request is no longer active.');
+    }
+    final code = response['code'];
+    final expiry = response['expires_at'];
+    // Accept only the documented human-readable code format. Do not fall back
+    // to a URL, token, credential, or serialized ticket when code is absent.
+    if (code is! String ||
+        code.length > 64 ||
+        !RegExp(r'^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$').hasMatch(code) ||
+        code == token ||
+        expiry is! String ||
+        !RegExp(r'(?:[zZ]|[+-]\d{2}:\d{2})$').hasMatch(expiry)) {
+      throw const CoCoApiException('Invalid pairing ticket response.');
+    }
+    final expiresAt = DateTime.tryParse(expiry);
+    if (expiresAt == null) {
+      throw const CoCoApiException('Invalid pairing ticket response.');
+    }
+    return PairingTicket._(code: code, expiresAt: expiresAt.toUtc());
   }
 
   /// Accepts an array or a {"devices": [...]} envelope.
@@ -452,4 +506,3 @@ class CoCoApi {
     if (_ownsClient) _client.close();
   }
 }
-

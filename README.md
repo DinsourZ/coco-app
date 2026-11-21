@@ -104,4 +104,3 @@ dart format lib test
 flutter analyze
 flutter test
 ```
-

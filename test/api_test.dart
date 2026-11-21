@@ -597,4 +597,3 @@ class _FakeSink implements WebSocketSink {
   @override
   Future<void> get done => _done.future;
 }
-

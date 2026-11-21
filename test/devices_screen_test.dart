@@ -464,4 +464,3 @@ FilledButton _stopButton(WidgetTester tester) =>
       of: find.text('STOP'),
       matching: find.byWidgetPredicate((widget) => widget is FilledButton),
     ));
-

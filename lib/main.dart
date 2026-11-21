@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'devices_screen.dart';
+import 'pairing_screen.dart';
 
 void main() => runApp(const CoCoApp());
 
@@ -45,6 +46,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             DevicesScreen(api: widget.api)
           else
             const SizedBox.shrink(),
+          if (_visitedTabs.contains(2))
+            PairingScreen(api: widget.api)
+          else
+            const SizedBox.shrink(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -66,6 +71,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             key: ValueKey('devices-tab'),
             icon: Icon(Icons.devices_outlined),
             label: 'Devices',
+          ),
+          NavigationDestination(
+            key: ValueKey('pairing-tab'),
+            icon: Icon(Icons.qr_code),
+            label: 'Pairing',
           ),
         ],
       ),
@@ -175,4 +185,3 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
-
