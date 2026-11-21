@@ -1,18 +1,20 @@
 name: coco_app
-
-description: A minimal CoCo App scaffold.
-
+description: A minimal Flutter scaffold for CoCo App.
 publish_to: 'none'
-
 version: 0.1.0+1
 
 environment:
-  sdk: '>=2.17.0 <4.0.0'
-
-  flutter: '>=3.0.0 <4.0.0'
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.10.0 <4.0.0'
 
 dependencies:
   flutter:
+    sdk: flutter
+  http: ^1.1.0
+  web_socket_channel: ^2.4.0
+
+dev_dependencies:
+  flutter_test:
     sdk: flutter
 
 flutter:
