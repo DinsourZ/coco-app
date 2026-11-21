@@ -4,16 +4,33 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-/// A transport error that deliberately excludes response bodies and credentials.
+/// A transport or HTTP error whose text excludes response bodies and credentials.
 class CoCoApiException implements Exception {
-  const CoCoApiException(this.message, {this.statusCode});
+  const CoCoApiException(this.message, {this.statusCode, this.response});
 
   final String message;
   final int? statusCode;
 
+  /// The actual HTTP result for Emergency STOP failures only.
+  /// Other operations keep server response bodies out of errors.
+  final CoCoApiResponse? response;
+
   @override
   String toString() => 'CoCoApiException: $message'
       '${statusCode == null ? '' : ' (HTTP $statusCode)'}';
+}
+
+/// An HTTP response, including its status and whether it had a body.
+class CoCoApiResponse {
+  const CoCoApiResponse({
+    required this.statusCode,
+    required this.body,
+    required this.hasBody,
+  });
+
+  final int statusCode;
+  final Object? body;
+  final bool hasBody;
 }
 
 /// An app event, retaining all server fields in [payload].
@@ -164,6 +181,31 @@ class CoCoApi {
     ], body: body, headers: preconditions));
   }
 
+  /// POST /api/devices/{deviceId}/motion/stop without control preconditions.
+  ///
+  /// This is deliberately separate from [safeAction]. On failure the HTTP
+  /// result is retained in [CoCoApiException.response]. Both successful and
+  /// failed responses retain their actual status and JSON or text body.
+  Future<CoCoApiResponse> emergencyStop(String deviceId) async {
+    http.Response? successfulResponse;
+    final body = await _request(
+      'POST',
+      ['api', 'devices', _segment(deviceId), 'motion', 'stop'],
+      allowTextResponse: true,
+      retainErrorResponse: true,
+      onSuccessResponse: (response) => successfulResponse = response,
+    );
+    final response = successfulResponse;
+    if (response == null) {
+      throw const CoCoApiException('CoCo request failed.');
+    }
+    return CoCoApiResponse(
+      statusCode: response.statusCode,
+      body: body,
+      hasBody: response.bodyBytes.isNotEmpty,
+    );
+  }
+
   /// POST {credentialsPath}/rotate and deliver `token` once to [onToken].
   ///
   /// The callback should display the token once, never log or persist it.
@@ -301,6 +343,9 @@ class CoCoApi {
     Map<String, Object?>? body,
     Map<String, String> headers = const {},
     void Function()? onSuccess,
+    void Function(http.Response response)? onSuccessResponse,
+    bool allowTextResponse = false,
+    bool retainErrorResponse = false,
   }) async {
     final token = _requireToken();
     final request = http.Request(method, _uri(path))
@@ -324,12 +369,21 @@ class CoCoApi {
         return http.Response.fromStream(streamed);
       })().timeout(timeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw CoCoApiException('CoCo request failed.',
-            statusCode: response.statusCode);
+        throw CoCoApiException(
+          'CoCo request failed.',
+          statusCode: response.statusCode,
+          response: retainErrorResponse
+              ? CoCoApiResponse(
+                  statusCode: response.statusCode,
+                  body: _decodeResponse(response, allowTextResponse: true),
+                  hasBody: response.bodyBytes.isNotEmpty,
+                )
+              : null,
+        );
       }
+      onSuccessResponse?.call(response);
       onSuccess?.call();
-      if (response.bodyBytes.isEmpty) return <String, Object?>{};
-      return jsonDecode(utf8.decode(response.bodyBytes));
+      return _decodeResponse(response, allowTextResponse: allowTextResponse);
     } on CoCoApiException {
       rethrow;
     } on TimeoutException {
@@ -339,6 +393,23 @@ class CoCoApi {
     } catch (_) {
       // Transport exceptions can contain headers or response data.
       throw const CoCoApiException('CoCo connection failed.');
+    }
+  }
+
+  Object? _decodeResponse(
+    http.Response response, {
+    required bool allowTextResponse,
+  }) {
+    if (response.bodyBytes.isEmpty) return <String, Object?>{};
+    final text = utf8.decode(
+      response.bodyBytes,
+      allowMalformed: allowTextResponse,
+    );
+    try {
+      return jsonDecode(text);
+    } on FormatException {
+      if (allowTextResponse) return text;
+      rethrow;
     }
   }
 
@@ -381,3 +452,4 @@ class CoCoApi {
     if (_ownsClient) _client.close();
   }
 }
+

@@ -151,6 +151,116 @@ void main() {
     expect(requests, isEmpty);
   });
 
+  test('emergencyStop sends no control preconditions and returns server result',
+      () async {
+    respond = (_) async => http.Response(
+          '{"status":"stop_requested"}',
+          202,
+        );
+    final result = await createApi().emergencyStop('device/1');
+
+    final request = requests.single;
+    expect(request.method, 'POST');
+    expect(request.url.pathSegments,
+        ['api', 'devices', 'device/1', 'motion', 'stop']);
+    expect(request.headers['Authorization'], 'Bearer $_testToken');
+    expect(request.followRedirects, isFalse);
+    expect(
+      request.headers.keys.where(
+        (name) => name.toLowerCase().startsWith('x-coco-control-') ||
+            name.toLowerCase().startsWith('if-'),
+      ),
+      isEmpty,
+    );
+    expect(request.body, isEmpty);
+    expect(result.statusCode, 202);
+    expect(result.hasBody, isTrue);
+    expect(result.body, {'status': 'stop_requested'});
+  });
+
+  test('emergencyStop preserves an empty success status and error status',
+      () async {
+    respond = (_) async => http.Response('', 204);
+    final api = createApi();
+    final result = await api.emergencyStop('device-1');
+    expect(result.statusCode, 204);
+    expect(result.hasBody, isFalse);
+
+    respond = (_) async =>
+        http.Response('{"error":"controller unavailable"}', 503);
+    await expectLater(
+      api.emergencyStop('device-1'),
+      throwsA(isA<CoCoApiException>()
+          .having((error) => error.statusCode, 'HTTP status', 503)
+          .having((error) => error.response?.statusCode, 'response status', 503)
+          .having((error) => error.response?.hasBody, 'has body', isTrue)
+          .having((error) => error.response?.body, 'server error',
+              {'error': 'controller unavailable'})),
+    );
+    expect(requests, hasLength(2));
+  });
+
+  test('emergencyStop returns a plain-text success body verbatim', () async {
+    respond = (_) async => http.Response('stop queued', 202);
+    final result = await createApi().emergencyStop('device-1');
+    expect(result.statusCode, 202);
+    expect(result.body, 'stop queued');
+    expect(result.hasBody, isTrue);
+  });
+
+  test('emergencyStop retains text errors and empty error responses', () async {
+    final api = createApi();
+    respond = (_) async => http.Response('Controller rejected the stop', 409);
+    await expectLater(
+      api.emergencyStop('device-1'),
+      throwsA(isA<CoCoApiException>()
+          .having((error) => error.response?.body, 'server error',
+              'Controller rejected the stop')
+          .having((error) => error.toString(), 'error text',
+              isNot(contains('Controller rejected the stop')))),
+    );
+
+    respond = (_) async => http.Response('', 502);
+    await expectLater(
+      api.emergencyStop('device-1'),
+      throwsA(isA<CoCoApiException>()
+          .having((error) => error.statusCode, 'HTTP status', 502)
+          .having((error) => error.response?.hasBody, 'has body', isFalse)),
+    );
+    expect(requests, hasLength(2));
+  });
+
+  test('emergencyStop retains server-declared failure in a 200 response',
+      () async {
+    respond = (_) async =>
+        http.Response('{"ok":false,"error":"not stopped"}', 200);
+    final result = await createApi().emergencyStop('device-1');
+    expect(result.statusCode, 200);
+    expect(result.body, {'ok': false, 'error': 'not stopped'});
+  });
+
+  test('emergencyStop reports transport failure or timeout without retrying',
+      () async {
+    final api = createApi(timeout: const Duration(milliseconds: 10));
+    respond = (_) async => throw http.ClientException(_testToken);
+    await expectLater(
+      api.emergencyStop('device-1'),
+      throwsA(isA<CoCoApiException>()
+          .having((error) => error.response, 'no server response', isNull)
+          .having((error) => error.statusCode, 'no invented status', isNull)
+          .having((error) => error.toString(), 'redacted transport error',
+              isNot(contains(_testToken)))),
+    );
+    respond = (_) => Completer<http.Response>().future;
+    await expectLater(
+      api.emergencyStop('device-1'),
+      throwsA(isA<CoCoApiException>()
+          .having((error) => error.message, 'timeout', contains('timed out'))
+          .having((error) => error.response, 'no server response', isNull)),
+    );
+    expect(requests, hasLength(2));
+  });
+
   test('precondition failures retain the status but never echo response data',
       () async {
     respond = (_) async => http.Response('sensitive $_testToken', 412);
@@ -162,6 +272,7 @@ void main() {
       ),
       throwsA(isA<CoCoApiException>()
           .having((e) => e.statusCode, 'status', 412)
+          .having((e) => e.response, 'no action response body', isNull)
           .having((e) => e.toString(), 'redacted error',
               isNot(contains(_testToken)))),
     );
@@ -486,3 +597,4 @@ class _FakeSink implements WebSocketSink {
   @override
   Future<void> get done => _done.future;
 }
+

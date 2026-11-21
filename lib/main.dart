@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'devices_screen.dart';
 
 void main() => runApp(const CoCoApp());
 
@@ -14,7 +15,60 @@ class CoCoApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'CoCo App',
-      home: ChatScreen(useMock: useMock, api: api),
+      home: MainNavigationScreen(useMock: useMock, api: api),
+    );
+  }
+}
+
+class MainNavigationScreen extends StatefulWidget {
+  const MainNavigationScreen({super.key, this.useMock = true, this.api});
+
+  final bool useMock;
+  final CoCoApi? api;
+
+  @override
+  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+}
+
+class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  int _selectedIndex = 0;
+  final Set<int> _visitedTabs = {0};
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          ChatScreen(useMock: widget.useMock, api: widget.api),
+          if (_visitedTabs.contains(1))
+            DevicesScreen(api: widget.api)
+          else
+            const SizedBox.shrink(),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: (index) {
+          FocusScope.of(context).unfocus();
+          setState(() {
+            _visitedTabs.add(index);
+            _selectedIndex = index;
+          });
+        },
+        destinations: const [
+          NavigationDestination(
+            key: ValueKey('chat-tab'),
+            icon: Icon(Icons.chat_bubble_outline),
+            label: 'Chat',
+          ),
+          NavigationDestination(
+            key: ValueKey('devices-tab'),
+            icon: Icon(Icons.devices_outlined),
+            label: 'Devices',
+          ),
+        ],
+      ),
     );
   }
 }
@@ -121,3 +175,4 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
+

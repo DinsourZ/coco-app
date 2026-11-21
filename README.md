@@ -1,9 +1,10 @@
 # CoCo App Flutter scaffold
 
 - `pubspec.yaml`: Flutter 3.10+ (3.x) and Dart 3, with `http` and the cross-platform `web_socket_channel` transport.
-- `lib/main.dart`: A chat screen with `useMock: true` by default. The default app makes no network requests.
+- `lib/main.dart`: Chat and Devices bottom navigation with `useMock: true` by default. The default app makes no network requests.
+- `lib/devices_screen.dart`: Server-reported device state, guarded quick actions, and an independent Emergency STOP bar.
 - `lib/api.dart`: Runtime-configured HTTP and app WebSocket client.
-- `test/`: Transport and chat mode regression tests.
+- `test/`: Transport, chat, navigation, and device safety regression tests.
 - `README.md`: This file and the build instructions below.
 
 From this directory, generate the web runner once, then build:
@@ -45,6 +46,13 @@ render streamed events or grant approvals.
   non-control header names, and newline-containing values fail locally. The
   server validates the actual preconditions; the client never invents or
   refreshes them to bypass a rejection.
+- `emergencyStop(deviceId)`: `POST /api/devices/{id}/motion/stop` with no
+  control-precondition headers or request body. Returns the actual HTTP status
+  and successful response body (JSON or text), including an explicit empty
+  body for responses such as 204. HTTP failures retain the real status code and
+  server body in `CoCoApiException.response` so the STOP bar can display the
+  actual error. Transport failures and timeouts report errors without inventing
+  a server response. STOP is never retried automatically.
 - `connectAppSocket(onChat: ..., onTool: ..., onApproval: ..., onMessage: ...,
   onError: ..., onDone: ...)`: connects to `/ws/app` using `wss` for HTTPS and
   `ws` for HTTP. After the handshake, the first client frame is
@@ -68,8 +76,25 @@ routes and JSON shapes above make those assumptions explicit. Credential route
 prefixes can be changed with the constructor's `credentialsPath` (an absolute
 API path, never a URL). A path prefix in `baseUrl` is preserved for gateways.
 Identifiers are encoded as individual path segments. HTTP redirects and
-automatic retries are disabled. Errors retain HTTP status codes but exclude
-raw response bodies so credential-bearing error responses are not surfaced.
+automatic retries are disabled. Error strings retain HTTP status codes but
+exclude raw response bodies. Only Emergency STOP exposes the server's error
+body through its structured response for display in the STOP bar.
+
+The Devices screen reads `id` (or `device_id`), `name`, `online` (or status),
+and server-advertised `quick_actions` (or `actions`) from each device. Each
+quick-action object supplies an `action` (or `name`), current `preconditions`
+(or `control_preconditions`, `precondition_headers`, or `headers`), optional
+`label`, and optional JSON `body`. Actions remain disabled unless the device is
+online and valid precondition headers are present. Refresh devices after any
+command before running another quick action; pending commands, pending
+refreshes, and failed refreshes cannot reuse a control snapshot. A precondition
+rejection is shown without retrying. Emergency STOP uses the currently selected
+device and stays available regardless of online status, quick-action
+preconditions, pending quick actions, or refresh failures. Its UI displays the
+server's HTTP status and body, including errors, or the transport error. An HTTP
+acknowledgement is displayed as received and never presented as proof that the
+device has stopped. Long responses scroll within the bar, keeping STOP visible.
+Quick-action results stay in their device cards so they cannot cover STOP.
 
 ## Checks
 
@@ -79,3 +104,4 @@ dart format lib test
 flutter analyze
 flutter test
 ```
+
