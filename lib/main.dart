@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'approvals_screen.dart';
 import 'devices_screen.dart';
 import 'pairing_screen.dart';
 
@@ -32,8 +33,29 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  static const _approvalsTabIndex = 3;
   int _selectedIndex = 0;
+  int _pendingApprovalCount = 0;
   final Set<int> _visitedTabs = {0};
+
+  CoCoApi? _approvalsApi(MainNavigationScreen screen) =>
+      !screen.useMock || _visitedTabs.contains(_approvalsTabIndex)
+          ? screen.api
+          : null;
+
+  @override
+  void didUpdateWidget(covariant MainNavigationScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(_approvalsApi(oldWidget), _approvalsApi(widget))) {
+      _pendingApprovalCount = 0;
+    }
+  }
+
+  void _updatePendingApprovalCount(int count) {
+    if (_pendingApprovalCount != count) {
+      setState(() => _pendingApprovalCount = count);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +72,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             PairingScreen(api: widget.api)
           else
             const SizedBox.shrink(),
+          ApprovalsScreen(
+            api: _approvalsApi(widget),
+            isActive: _selectedIndex == _approvalsTabIndex,
+            onPendingCountChanged: _updatePendingApprovalCount,
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -61,21 +88,34 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             _selectedIndex = index;
           });
         },
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             key: ValueKey('chat-tab'),
             icon: Icon(Icons.chat_bubble_outline),
             label: 'Chat',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             key: ValueKey('devices-tab'),
             icon: Icon(Icons.devices_outlined),
             label: 'Devices',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             key: ValueKey('pairing-tab'),
             icon: Icon(Icons.qr_code),
             label: 'Pairing',
+          ),
+          NavigationDestination(
+            key: const ValueKey('approvals-tab'),
+            icon: Badge(
+              isLabelVisible: _pendingApprovalCount > 0,
+              label: Text(
+                '$_pendingApprovalCount',
+                semanticsLabel: '$_pendingApprovalCount pending '
+                    '${_pendingApprovalCount == 1 ? 'approval' : 'approvals'}',
+              ),
+              child: const Icon(Icons.fact_check_outlined),
+            ),
+            label: 'Approvals',
           ),
         ],
       ),
@@ -115,7 +155,8 @@ class _ChatScreenState extends State<ChatScreen> {
       } else {
         final api = widget.api;
         if (api == null) {
-          throw StateError('Real chat requires a runtime-configured API client.');
+          throw StateError(
+              'Real chat requires a runtime-configured API client.');
         }
         final response = await api.postChat({
           'message': message,
@@ -185,3 +226,4 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
+

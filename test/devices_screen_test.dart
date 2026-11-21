@@ -208,7 +208,7 @@ void main() {
     var loads = 0;
     final api = _apiFor((request) async {
       if (request.method == 'GET') {
-        return ++loads == 1 ? _guardedDeviceResponse() : refresh.future;
+        return ++loads == 1 ? _guardedDeviceResponse() : await refresh.future;
       }
       return http.Response('', 204);
     });
@@ -268,7 +268,7 @@ void main() {
       if (request.method == 'GET') return _guardedDeviceResponse();
       return ++stopRequests == 1
           ? http.Response('controller acknowledged request', 202)
-          : pendingStop.future;
+          : await pendingStop.future;
     });
     await _openDevices(tester, api);
     await tester.tap(find.text('STOP'));
@@ -464,3 +464,4 @@ FilledButton _stopButton(WidgetTester tester) =>
       of: find.text('STOP'),
       matching: find.byWidgetPredicate((widget) => widget is FilledButton),
     ));
+

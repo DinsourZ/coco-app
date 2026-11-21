@@ -38,6 +38,9 @@ void main() {
       (tester) async {
     final bodies = <Map<String, dynamic>>[];
     final client = MockClient((request) async {
+      if (request.method == 'GET' && request.url.path == '/api/approvals') {
+        return http.Response('[]', 200);
+      }
       bodies.add(jsonDecode(request.body) as Map<String, dynamic>);
       return http.Response('{"message":"Real reply"}', 200);
     });
@@ -63,3 +66,4 @@ void main() {
     expect(find.text('CoCo: This is a mock reply.'), findsNothing);
   });
 }
+

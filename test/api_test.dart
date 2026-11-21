@@ -561,7 +561,7 @@ class _FakeSocket implements WebSocketChannel {
   @override
   final Future<void> ready;
   @override
-  final sink = _FakeSink();
+  final _FakeSink sink = _FakeSink();
   @override
   Stream<dynamic> get stream => incoming.stream;
 
@@ -597,3 +597,4 @@ class _FakeSink implements WebSocketSink {
   @override
   Future<void> get done => _done.future;
 }
+

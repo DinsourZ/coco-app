@@ -11,7 +11,7 @@ class CoCoApiException implements Exception {
   final String message;
   final int? statusCode;
 
-  /// The actual HTTP result for Emergency STOP failures only.
+  /// The actual HTTP result for Emergency STOP and approval decision failures.
   /// Other operations keep server response bodies out of errors.
   final CoCoApiResponse? response;
 
@@ -210,6 +210,35 @@ class CoCoApi {
     return devices.map(_object).toList(growable: false);
   }
 
+  /// GET /api/approvals, accepting an array or an {"approvals": [...]} envelope.
+  /// Entries without a status are treated as coming from a pending-only queue.
+  Future<List<Map<String, Object?>>> listPendingApprovals() async {
+    final response = await _request('GET', ['api', 'approvals']);
+    final approvals = response is Map ? response['approvals'] : response;
+    if (approvals is! List) {
+      throw const CoCoApiException('Invalid approvals response.');
+    }
+    return approvals.map(_object).where((approval) {
+      final status = approval['status'];
+      return status == null ||
+          status is String && status.trim().toLowerCase() == 'pending';
+    }).toList(growable: false);
+  }
+
+  /// POST /api/approvals/{approvalId}/approve or /deny.
+  /// Retains the server's HTTP status and body for display in the queue.
+  Future<CoCoApiResponse> resolveApproval({
+    required String approvalId,
+    required bool approve,
+  }) async {
+    return _postWithResult([
+      'api',
+      'approvals',
+      _segment(approvalId),
+      approve ? 'approve' : 'deny',
+    ]);
+  }
+
   /// POST /api/devices/{deviceId}/actions/{action}.
   ///
   /// Pass complete X-CoCo-Control-* preconditions from the current device
@@ -241,10 +270,15 @@ class CoCoApi {
   /// result is retained in [CoCoApiException.response]. Both successful and
   /// failed responses retain their actual status and JSON or text body.
   Future<CoCoApiResponse> emergencyStop(String deviceId) async {
+    return _postWithResult(
+        ['api', 'devices', _segment(deviceId), 'motion', 'stop']);
+  }
+
+  Future<CoCoApiResponse> _postWithResult(List<String> path) async {
     http.Response? successfulResponse;
     final body = await _request(
       'POST',
-      ['api', 'devices', _segment(deviceId), 'motion', 'stop'],
+      path,
       allowTextResponse: true,
       retainErrorResponse: true,
       onSuccessResponse: (response) => successfulResponse = response,
@@ -506,3 +540,4 @@ class CoCoApi {
     if (_ownsClient) _client.close();
   }
 }
+

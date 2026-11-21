@@ -1,8 +1,9 @@
 # CoCo App Flutter scaffold
 
 - `pubspec.yaml`: Flutter 3.10+ (3.x) and Dart 3, with `http` and the cross-platform `web_socket_channel` transport.
-- `lib/main.dart`: Chat and Devices bottom navigation with `useMock: true` by default. The default app makes no network requests.
+- `lib/main.dart` provides the Chat, Devices, Pairing, and Approvals tabs with `useMock: true` by default. The default app makes no network requests.
 - `lib/devices_screen.dart`: Server-reported device state, guarded quick actions, and an independent Emergency STOP bar.
+- `lib/approvals_screen.dart` shows pending tool requests, their risk labels, and server results for approval decisions.
 - `lib/api.dart`: Runtime-configured HTTP and app WebSocket client.
 - `test/`: Transport, chat, navigation, and device safety regression tests.
 - `README.md`: This file and the build instructions below.
@@ -29,9 +30,9 @@ To enable real HTTP chat, pass the client to
 `CoCoApp(useMock: false, api: api)` or
 `ChatScreen(useMock: false, api: api)`. The screen creates a new `request_id` for
 each message. It displays an immediate `message`/`reply` when supplied by the
-server, otherwise acknowledges submission. Streaming chat and tool/approval UI
-can subscribe through `connectAppSocket`; the screen's HTTP mode does not itself
-render streamed events or grant approvals.
+server, otherwise acknowledges submission. Tool approvals are reviewed in the
+Approvals tab. The pending count loads at startup in real mode and refreshes
+when opening the tab, using its refresh button, or submitting a decision.
 
 ## Client contract
 
@@ -40,6 +41,16 @@ render streamed events or grant approvals.
 - `cancelChat(requestId)`: `POST /api/chat/requests/{id}/cancel`.
 - `listDevices()`: `GET /api/devices`, returning objects from a JSON array or a
   `devices` envelope.
+- `listPendingApprovals()` calls `GET /api/approvals` and accepts objects from a
+  JSON array or an `approvals` envelope. The screen reads `id`, `tool_name`, `risk`
+  (`safe`, `approval`, or `blocked`), `arguments_summary` or `arguments`, and
+  `device_name` or `device_id`. Entries with an explicit `status` are included
+  only when it is `pending`.
+- `resolveApproval(approvalId: ..., approve: ...)` sends a `POST` to
+  `/api/approvals/{id}/approve` or `/api/approvals/{id}/deny` with an empty
+  request body. The screen displays the actual HTTP status and response body,
+  then refreshes the queue. The Approve button is disabled for blocked tools
+  and unknown risk classifications.
 - `safeAction(deviceId: ..., action: ..., preconditions: ..., body: ...)`:
   `POST /api/devices/{id}/actions/{action}`. Supply the complete current
   `X-CoCo-Control-*` headers from the device state. Empty preconditions,
@@ -70,15 +81,15 @@ render streamed events or grant approvals.
   or revocation clears the old in-memory token and disconnects the socket.
   Further operations require a new client with runtime-supplied credentials.
 
-The scaffold contains no backend specification for device action paths,
-credential routes, or event payload fields beyond their event families. The
+The scaffold contains no backend specification for approval or device action
+paths, credential routes, or event payload fields beyond their event families. The
 routes and JSON shapes above make those assumptions explicit. Credential route
 prefixes can be changed with the constructor's `credentialsPath` (an absolute
 API path, never a URL). A path prefix in `baseUrl` is preserved for gateways.
 Identifiers are encoded as individual path segments. HTTP redirects and
 automatic retries are disabled. Error strings retain HTTP status codes but
-exclude raw response bodies. Only Emergency STOP exposes the server's error
-body through its structured response for display in the STOP bar.
+exclude raw response bodies. Emergency STOP and approval decisions expose the
+server's error body through a structured response for display in their screens.
 
 The Devices screen reads `id` (or `device_id`), `name`, `online` (or status),
 and server-advertised `quick_actions` (or `actions`) from each device. Each
@@ -104,3 +115,4 @@ dart format lib test
 flutter analyze
 flutter test
 ```
+
